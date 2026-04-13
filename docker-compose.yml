@@ -8,6 +8,7 @@ services:
       - "7000:6379"
     volumes:
       - ./redis-node.conf:/usr/local/etc/redis/redis.conf
+      - redis-node-1-data:/data
     command: ['redis-server','/usr/local/etc/redis/redis.conf']
     networks:
       - redis-cluster
@@ -18,6 +19,7 @@ services:
       - "7001:6379"
     volumes:
       - ./redis-node.conf:/usr/local/etc/redis/redis.conf
+      - redis-node-2-data:/data
     command: ['redis-server','/usr/local/etc/redis/redis.conf']
     networks:
       - redis-cluster
@@ -28,6 +30,7 @@ services:
       - "7002:6379"
     volumes:
       - ./redis-node.conf:/usr/local/etc/redis/redis.conf
+      - redis-node-3-data:/data
     command: ['redis-server','/usr/local/etc/redis/redis.conf']
     networks:
       - redis-cluster
@@ -38,6 +41,7 @@ services:
       - "7003:6379"
     volumes:
       - ./redis-node.conf:/usr/local/etc/redis/redis.conf
+      - redis-node-4-data:/data
     command: ['redis-server','/usr/local/etc/redis/redis.conf']
     networks:
       - redis-cluster
@@ -48,6 +52,7 @@ services:
       - "7004:6379"
     volumes:
       - ./redis-node.conf:/usr/local/etc/redis/redis.conf
+      - redis-node-5-data:/data
     command: ['redis-server','/usr/local/etc/redis/redis.conf']
     networks:
       - redis-cluster
@@ -58,6 +63,7 @@ services:
       - "7005:6379"
     volumes:
       - ./redis-node.conf:/usr/local/etc/redis/redis.conf
+      - redis-node-6-data:/data
     command: ['redis-server','/usr/local/etc/redis/redis.conf']
     networks:
       - redis-cluster
@@ -66,14 +72,18 @@ services:
   redis-master:
     image: redis:7-alpine
     container_name: redis-master
-    command: redis-server --appendonly yes
+    volumes:
+      - redis-master-data:/data
+    command: redis-server --appendonly yes --save 60 1 --dir /data
     networks:
       - redis-cluster
 
   redis-replica:
     image: redis:7-alpine
     container_name: redis-replica
-    command: redis-server --replicaof redis-master 6379 --appendonly yes
+    volumes:
+      - redis-replica-data:/data
+    command: redis-server --replicaof redis-master 6379 --appendonly yes --save 60 1 --dir /data
     depends_on:
       - redis-master
     networks:
@@ -88,7 +98,14 @@ services:
       echo 'sentinel down-after-milliseconds mymaster 5000' >> sentinel.conf &&
       echo 'sentinel failover-timeout mymaster 60000' >> sentinel.conf &&
       echo 'sentinel parallel-syncs mymaster 1' >> sentinel.conf &&
+      echo 'bind 0.0.0.0' >> sentinel.conf &&
+      echo 'protected-mode no' >> sentinel.conf &&
       redis-server sentinel.conf --sentinel"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     depends_on:
       - redis-master
       - redis-replica
@@ -104,7 +121,14 @@ services:
       echo 'sentinel down-after-milliseconds mymaster 5000' >> sentinel.conf &&
       echo 'sentinel failover-timeout mymaster 60000' >> sentinel.conf &&
       echo 'sentinel parallel-syncs mymaster 1' >> sentinel.conf &&
+      echo 'bind 0.0.0.0' >> sentinel.conf &&
+      echo 'protected-mode no' >> sentinel.conf &&
       redis-server sentinel.conf --sentinel"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     depends_on:
       - redis-master
       - redis-replica
@@ -120,7 +144,14 @@ services:
       echo 'sentinel down-after-milliseconds mymaster 5000' >> sentinel.conf &&
       echo 'sentinel failover-timeout mymaster 60000' >> sentinel.conf &&
       echo 'sentinel parallel-syncs mymaster 1' >> sentinel.conf &&
+      echo 'bind 0.0.0.0' >> sentinel.conf &&
+      echo 'protected-mode no' >> sentinel.conf &&
       redis-server sentinel.conf --sentinel"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     depends_on:
       - redis-master
       - redis-replica
@@ -157,10 +188,27 @@ services:
       - USE_SENTINEL=true
       - PORT=3000
     depends_on:
-      - redis-cluster-init
+      redis-cluster-init:
+        condition: service_started
+      redis-sentinel-1:
+        condition: service_healthy
+      redis-sentinel-2:
+        condition: service_healthy
+      redis-sentinel-3:
+        condition: service_healthy
     networks:
       - redis-cluster
 
 networks:
   redis-cluster:
     driver: bridge
+
+volumes:
+  redis-node-1-data:
+  redis-node-2-data:
+  redis-node-3-data:
+  redis-node-4-data:
+  redis-node-5-data:
+  redis-node-6-data:
+  redis-master-data:
+  redis-replica-data:

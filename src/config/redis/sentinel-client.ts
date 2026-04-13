@@ -3,9 +3,18 @@ import Redis, { type RedisOptions } from "ioredis";
 // Sentinel configuration
 const sentinelOptions: RedisOptions = {
   sentinels: [
-    { host: process.env.IS_DOCKER === 'true' ? 'redis-sentinel-1' : '127.0.0.1', port: 26379 },
-    { host: process.env.IS_DOCKER === 'true' ? 'redis-sentinel-2' : '127.0.0.1', port: 26380 },
-    { host: process.env.IS_DOCKER === 'true' ? 'redis-sentinel-3' : '127.0.0.1', port: 26381 },
+    { 
+      host: process.env.IS_DOCKER === 'true' ? 'redis-sentinel-1' : '127.0.0.1', 
+      port: 26379 
+    },
+    { 
+      host: process.env.IS_DOCKER === 'true' ? 'redis-sentinel-2' : '127.0.0.1', 
+      port: process.env.IS_DOCKER === 'true' ? 26379 : 26380 
+    },
+    { 
+      host: process.env.IS_DOCKER === 'true' ? 'redis-sentinel-3' : '127.0.0.1', 
+      port: process.env.IS_DOCKER === 'true' ? 26379 : 26381 
+    },
   ],
   name: 'mymaster', // Must match the master name configured in Sentinel
   role: 'master',   // Connect to the master for write operations

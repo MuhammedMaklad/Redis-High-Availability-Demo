@@ -7,6 +7,8 @@ This project demonstrates a robust integration of a Node.js Express application 
 - **Dual Mode Support**: Seamlessly switch between **Redis Cluster** and **Redis Sentinel** using environment variables.
 - **Redis Cluster Setup**: Automated initialization of a 6-node Redis Cluster (3 masters, 3 replicas).
 - **Redis Sentinel HA**: High Availability setup with a Master, Replica, and 3 Sentinel nodes for automatic failover.
+- **Hybrid Persistence**: Implementation of both **RDB (Snapshots)** and **AOF (Append Only File)** for maximum data safety.
+- **Data Durability**: Docker volumes ensure that Redis data and cluster configurations survive container restarts and removals.
 - **Cache-Aside Pattern**: Efficiently manages data fetching between a (mocked) database and Redis.
 - **Distributed Locking**: Prevents "thundering herd" (cache stampede) issues using atomic `SET NX EX` locks.
 - **Resilient Redis Client**: Configured with `ioredis` for both Cluster and Sentinel modes, including retry strategies.
