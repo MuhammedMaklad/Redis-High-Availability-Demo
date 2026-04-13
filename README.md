@@ -1,14 +1,16 @@
-# Redis Cluster Node.js Demo
+# Redis High Availability Demo (Cluster & Sentinel)
 
-This project demonstrates a robust integration of a Node.js Express application with a Redis Cluster. It includes a fully dockerized environment with a 6-node Redis Cluster (3 masters, 3 replicas) and implements advanced caching patterns.
+This project demonstrates a robust integration of a Node.js Express application with both **Redis Cluster** and **Redis Sentinel**. It includes a fully dockerized environment with a 6-node Redis Cluster and a Sentinel-managed Master-Replica setup, providing two different ways to achieve high availability and scalability.
 
 ## 🚀 Features
 
-- **Redis Cluster Setup**: Automated initialization of a 6-node Redis Cluster using Docker Compose.
+- **Dual Mode Support**: Seamlessly switch between **Redis Cluster** and **Redis Sentinel** using environment variables.
+- **Redis Cluster Setup**: Automated initialization of a 6-node Redis Cluster (3 masters, 3 replicas).
+- **Redis Sentinel HA**: High Availability setup with a Master, Replica, and 3 Sentinel nodes for automatic failover.
 - **Cache-Aside Pattern**: Efficiently manages data fetching between a (mocked) database and Redis.
 - **Distributed Locking**: Prevents "thundering herd" (cache stampede) issues using atomic `SET NX EX` locks.
-- **Resilient Redis Client**: Configured with `ioredis` Cluster mode, including retry strategies and auto-pipelining.
-- **TypeScript**: Fully typed codebase for better maintainability and developer experience.
+- **Resilient Redis Client**: Configured with `ioredis` for both Cluster and Sentinel modes, including retry strategies.
+- **TypeScript**: Fully typed codebase for better maintainability.
 - **Observability**: Event listeners for Redis connection status, errors, and redirections.
 
 ## 🛠️ Tech Stack
@@ -22,18 +24,26 @@ This project demonstrates a robust integration of a Node.js Express application 
 
 ## 🏗️ Architecture
 
-The project consists of:
-1. **6 Redis Nodes**: Configured in cluster mode.
-2. **Initialization Service**: A helper container that runs `redis-cli --cluster create` once all nodes are healthy.
-3. **Backend Service**: An Express API that interacts with the cluster.
+The project supports two high-availability architectures:
 
-### Key Logic: `getOrSet`
-The `CacheService` implements a robust `getOrSet` method:
-1. Try to fetch from Redis.
-2. If it's a **miss**, acquire a distributed lock.
-3. Once the lock is acquired, re-check the cache (double-checked locking).
-4. Fetch from DB if still a miss.
-5. Populate cache and release lock.
+### 1. Redis Cluster (Scalability + HA)
+- **6 Redis Nodes**: 3 Masters for data partitioning and 3 Replicas for redundancy.
+- **Data Sharding**: Automatically distributes keys across 16,384 slots.
+- **Initialization**: A helper service runs `redis-cli --cluster create` to bootstrap the cluster.
+
+### 2. Redis Sentinel (High Availability)
+- **Master-Replica**: One primary node for writes and one or more replicas for reads/redundancy.
+- **3 Sentinel Nodes**: Monitor the master and perform automatic failover if it goes down.
+- **Client Discovery**: The application asks Sentinels for the current master's address.
+
+## ⚙️ Configuration
+
+Control the Redis connection mode using the `USE_SENTINEL` environment variable in `docker-compose.yml`:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `USE_SENTINEL` | Set to `true` to use Redis Sentinel, `false` for Redis Cluster. | `true` |
+| `IS_DOCKER` | Set to `true` when running inside Docker to use container hostnames. | `true` |
 
 ## 🚦 Getting Started
 
@@ -41,33 +51,36 @@ The `CacheService` implements a robust `getOrSet` method:
 - Docker and Docker Compose installed.
 
 ### Running with Docker (Recommended)
-This is the easiest way to see the cluster in action:
+By default, the project starts with **Redis Sentinel** enabled.
 
 ```bash
 docker-compose up --build
 ```
 
-This will:
-- Start 6 Redis nodes.
-- Initialize the cluster (3 masters, 3 replicas).
-- Start the backend API on `http://localhost:3000`.
+This will start:
+- 6 Redis Cluster nodes (available but unused if `USE_SENTINEL=true`).
+- 1 Redis Master and 1 Redis Replica.
+- 3 Redis Sentinel nodes.
+- The Backend API on `http://localhost:3000`.
 
-### Running Locally
-If you want to run the backend locally while Redis is in Docker:
-1. Ensure the Redis nodes are exposed (default ports 7000-7005).
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Run in development mode:
-   ```bash
-   npm run dev
-   ```
+### Switching to Redis Cluster
+To use the Cluster instead of Sentinel, update your `docker-compose.yml`:
+
+```yaml
+backend:
+  environment:
+    - USE_SENTINEL=false
+```
+
+Then restart the services:
+```bash
+docker-compose up -d backend
+```
 
 ## 🔌 API Endpoints
 
 ### Fetch User Profile
-Fetches a user profile, utilizing the Redis Cluster for caching.
+Fetches a user profile, utilizing the active Redis configuration for caching.
 
 - **URL**: `/api/v1/user/fetch-user-profile/:userId`
 - **Method**: `GET`
@@ -84,11 +97,12 @@ Fetches a user profile, utilizing the Redis Cluster for caching.
     }
     ```
 
-## ⚙️ Configuration
+## 📂 Project Structure
 
-- `redis-node.conf`: Redis cluster configuration (port, cluster-enabled, etc.).
-- `init-cluster.sh`: Script used by Docker to join nodes into a cluster.
-- `src/config/redis/redis-client.ts`: Connection logic for `ioredis`.
+- `src/config/redis/index.ts`: Unified client exporter (Cluster vs. Sentinel).
+- `src/config/redis/redis-client.ts`: Cluster-specific connection and topology helpers.
+- `src/config/redis/sentinel-client.ts`: Sentinel-specific connection logic.
+- `src/services/cache-service.ts`: Core caching logic using the selected Redis client.
 
 ## 📜 License
 ISC

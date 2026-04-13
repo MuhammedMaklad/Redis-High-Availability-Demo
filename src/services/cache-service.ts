@@ -1,6 +1,6 @@
 
 
-import redisCluster from "../config/redis/redis-client.ts";
+import redisClient from "../config/redis/index.ts";
 
 export class CacheService {
   async getOrSet<T>(
@@ -10,7 +10,7 @@ export class CacheService {
   ): Promise<T | null> {
     try {
       // try to get from cache
-      const cachedValue = await redisCluster.get(key);
+      const cachedValue = await redisClient.get(key);
 
       // cache hit
       if (cachedValue !== null)
@@ -19,7 +19,7 @@ export class CacheService {
       // -> use a distributed lock to prevent thundering herd
       // use SET NX EX for atomic lock acquisition
       const lockKey = `${key}:lock`;
-      const lockAcquired = await redisCluster.set(
+      const lockAcquired = await redisClient.set(
         lockKey,
         '1',
         'EX',
@@ -30,7 +30,7 @@ export class CacheService {
       if (lockAcquired == 'OK') {
         try {
           // double-check cache lock (another request might have filled it)
-          const recheck = await redisCluster.get(key);
+          const recheck = await redisClient.get(key);
           if (recheck != null)
             return JSON.parse(recheck) as T;
 
@@ -38,14 +38,14 @@ export class CacheService {
           const data = await fetchFromDb();
 
           if (data != null)
-            await redisCluster.setex(key, ttlSeconds, JSON.stringify(data));
+            await redisClient.setex(key, ttlSeconds, JSON.stringify(data));
           else
             // to prevent penetration attacks
-            await redisCluster.setex(key, 60, JSON.stringify(null));
+            await redisClient.setex(key, 60, JSON.stringify(null));
           return data;
         } finally {
           // release the lock
-          const res = await redisCluster.del(lockKey);
+          const res = await redisClient.del(lockKey);
         }
       }
       else{
@@ -65,7 +65,7 @@ export class CacheService {
    */
   async invalidate(key: string):Promise<void> {
     try{
-      await  redisCluster.del(key);
+      await  redisClient.del(key);
     }
     catch (e) {
       console.log(`Error invalidating key ${key}:`, e);
@@ -79,17 +79,17 @@ export class CacheService {
     const key = `user:${userId}:profile`;
 
     // HSET in ioredis can take an object to set multiple fields at once
-    await redisCluster.hset(key, profile);
+    await redisClient.hset(key, profile);
     // Set expiry on the hash
-    await redisCluster.expire(key, 3600);
+    await redisClient.expire(key, 3600);
   }
 
   async getUserProfile(userId: string):Promise<Record<string, any> | null> {
     const key = `user:${userId}:profile`;
-    const exists = await redisCluster.exists(key);
+    const exists = await redisClient.exists(key);
     if(!exists)
       return null;
-    return redisCluster.hgetall(key);
+    return redisClient.hgetall(key);
   }
 
 }

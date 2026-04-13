@@ -62,6 +62,71 @@ services:
     networks:
       - redis-cluster
 
+  # --- Redis Sentinel HA Setup ---
+  redis-master:
+    image: redis:7-alpine
+    container_name: redis-master
+    command: redis-server --appendonly yes
+    networks:
+      - redis-cluster
+
+  redis-replica:
+    image: redis:7-alpine
+    container_name: redis-replica
+    command: redis-server --replicaof redis-master 6379 --appendonly yes
+    depends_on:
+      - redis-master
+    networks:
+      - redis-cluster
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    container_name: redis-sentinel-1
+    command: >
+      sh -c "echo 'port 26379' > sentinel.conf &&
+      echo 'sentinel monitor mymaster redis-master 6379 2' >> sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 60000' >> sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> sentinel.conf &&
+      redis-server sentinel.conf --sentinel"
+    depends_on:
+      - redis-master
+      - redis-replica
+    networks:
+      - redis-cluster
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    container_name: redis-sentinel-2
+    command: >
+      sh -c "echo 'port 26379' > sentinel.conf &&
+      echo 'sentinel monitor mymaster redis-master 6379 2' >> sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 60000' >> sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> sentinel.conf &&
+      redis-server sentinel.conf --sentinel"
+    depends_on:
+      - redis-master
+      - redis-replica
+    networks:
+      - redis-cluster
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    container_name: redis-sentinel-3
+    command: >
+      sh -c "echo 'port 26379' > sentinel.conf &&
+      echo 'sentinel monitor mymaster redis-master 6379 2' >> sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 60000' >> sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> sentinel.conf &&
+      redis-server sentinel.conf --sentinel"
+    depends_on:
+      - redis-master
+      - redis-replica
+    networks:
+      - redis-cluster
+
   # helper service to initialize the cluster
   redis-cluster-init:
     image: redis:7-alpine
@@ -89,6 +154,7 @@ services:
       - /app/node_modules
     environment:
       - IS_DOCKER=true
+      - USE_SENTINEL=true
       - PORT=3000
     depends_on:
       - redis-cluster-init
